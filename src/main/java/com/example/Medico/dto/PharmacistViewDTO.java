@@ -8,9 +8,8 @@ public class PharmacistViewDTO {
     private Long prescriptionId;
     private String patientName;
 
-    // Key = Medicine ID, Value = Quantity
-    // (Ideally, you would fetch names here, but for MVP, IDs are okay)
-    private Map<Long, Integer> medicinesToDispense;
+    // Key = Medicine Name, Value = Quantity
+    private Map<String, Integer> medicinesToDispense;
 
     private String status;
 }

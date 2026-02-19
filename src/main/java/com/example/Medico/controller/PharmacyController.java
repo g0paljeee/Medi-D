@@ -19,6 +19,8 @@ public class PharmacyController {
 
     @Autowired
     private PrescriptionRepository prescriptionRepo;
+    @Autowired
+    private com.example.Medico.repository.MedicineRepository medicineRepo;
 
     // Constraint 2: Only return safe data (Privacy Firewall)
     @GetMapping("/queue")
@@ -34,11 +36,17 @@ public class PharmacyController {
                 dto.setPatientName("Unknown Patient");
             }
 
-            // Map the medicine quantities map to the DTO
-            // We need to convert Map<Long, Integer> (ID->Qty) to Map<String, Integer> (Name->Qty)
-            // Note: In a real app, you'd fetch names. For now, we return ID or need a fetch.
-            // Simplified for MVP: returning raw map or empty if null
-            dto.setMedicinesToDispense(p.getMedicineQuantities());
+            // Map the medicine quantities map (ID -> Qty) to (Name -> Qty)
+            if (p.getMedicineQuantities() != null) {
+                java.util.Map<String, Integer> mapped = new java.util.HashMap<>();
+                for (java.util.Map.Entry<Long, Integer> e : p.getMedicineQuantities().entrySet()) {
+                    Long medId = e.getKey();
+                    Integer qty = e.getValue();
+                    String name = medicineRepo.findById(medId).map(m -> m.getName()).orElse("Medicine-" + medId);
+                    mapped.put(name, qty);
+                }
+                dto.setMedicinesToDispense(mapped);
+            }
 
             dto.setStatus(p.getStatus());
 

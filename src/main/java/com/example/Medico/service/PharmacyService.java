@@ -19,9 +19,38 @@ public class PharmacyService {
     @Autowired
     private PrescriptionRepository prescriptionRepo;
 
-    // The "Rollback" Magic
-    @Transactional(rollbackFor = Exception.class)
+    // Public wrapper implements retry logic for transient lock failures while the
+    // actual update is performed in a transactional method.
+    private static final int MAX_RETRIES = 3;
+
+    @Autowired
+    private org.springframework.context.ApplicationContext applicationContext;
+
     public void dispenseMedicines(Long prescriptionId) throws Exception {
+        int attempts = 0;
+        while (true) {
+            try {
+                // Obtain proxy bean from context to ensure transactional proxy is used
+                PharmacyService proxy = applicationContext.getBean(PharmacyService.class);
+                proxy.doDispenseTransactional(prescriptionId);
+                return;
+            } catch (org.springframework.dao.PessimisticLockingFailureException e) {
+                attempts++;
+                if (attempts >= MAX_RETRIES) {
+                    throw new RuntimeException("Failed to acquire lock after retries: " + e.getMessage());
+                }
+                try {
+                    Thread.sleep(100L * attempts);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", ie);
+                }
+            }
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void doDispenseTransactional(Long prescriptionId) throws Exception {
 
         Prescription prescription = prescriptionRepo.findById(prescriptionId)
                 .orElseThrow(() -> new RuntimeException("Prescription not found"));
