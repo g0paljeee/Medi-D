@@ -1,16 +1,9 @@
 package com.example.Medico;
 
-import com.example.Medico.model.Appointment;
-import com.example.Medico.model.Medicine;
-import com.example.Medico.model.Patient;
-import com.example.Medico.model.Prescription;
-import com.example.Medico.repository.AppointmentRepository;
-import com.example.Medico.repository.MedicineRepository;
-import com.example.Medico.repository.PatientRepository;
-import com.example.Medico.repository.PrescriptionRepository;
-import com.example.Medico.model.Doctor;
-import com.example.Medico.repository.DoctorRepository;
+import com.example.Medico.model.*;
+import com.example.Medico.repository.*;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -23,65 +16,87 @@ public class DataLoader implements CommandLineRunner {
     private final MedicineRepository medicineRepo;
     private final PatientRepository patientRepo;
     private final PrescriptionRepository prescriptionRepo;
-    private final AppointmentRepository appointmentRepo; // 1. Added field here
+    private final AppointmentRepository appointmentRepo;
     private final DoctorRepository doctorRepo;
+    private final UserRepository userRepo;
+    private final PasswordEncoder passwordEncoder;
 
-    // 2. Updated Constructor to inject AppointmentRepository
     public DataLoader(MedicineRepository medicineRepo,
                       PatientRepository patientRepo,
                       PrescriptionRepository prescriptionRepo,
                       AppointmentRepository appointmentRepo,
-                      DoctorRepository doctorRepo) {
+                      DoctorRepository doctorRepo,
+                      UserRepository userRepo,
+                      PasswordEncoder passwordEncoder) {
         this.medicineRepo = medicineRepo;
         this.patientRepo = patientRepo;
         this.prescriptionRepo = prescriptionRepo;
-        this.appointmentRepo = appointmentRepo; // 3. Assigned it here
+        this.appointmentRepo = appointmentRepo;
         this.doctorRepo = doctorRepo;
+        this.userRepo = userRepo;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    private void createUserIfMissing(String username, String email, String rawPassword, String role, String fullName) {
+        if (userRepo.existsByUsername(username)) {
+            return;
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+        user.setFullName(fullName);
+        user.setActive(true);
+        userRepo.save(user);
     }
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         System.out.println("⏳ Loading Test Data...");
 
-        // 1. Create Medicines
+        // 1. Create Test Users with hashed passwords (if missing)
+        createUserIfMissing("receptionist", "receptionist@medico.com", "recep123", "RECEPTIONIST", "Priya Singh");
+        createUserIfMissing("doctor", "doctor@medico.com", "doctor123", "DOCTOR", "Dr. Rajesh Verma");
+        createUserIfMissing("pharmacist", "pharmacist@medico.com", "pharma123", "PHARMACIST", "Kavya Sharma");
+        createUserIfMissing("admin", "admin@medico.com", "admin123", "ADMIN", "System Administrator");
+
+        // 2. Create Medicines
         Medicine paracetamol = new Medicine(null, "Paracetamol", 50, LocalDate.now().plusYears(1));
-        Medicine aspirin = new Medicine(null, "Aspirin", 5, LocalDate.now().plusYears(1)); // Low Stock!
+        Medicine aspirin = new Medicine(null, "Aspirin", 5, LocalDate.now().plusYears(1));
 
         medicineRepo.save(paracetamol);
         medicineRepo.save(aspirin);
 
-        // 2. Create Patients (Indian names)
+        // 3. Create Patients
         Patient patient1 = new Patient(null, "Munna Kumar", "Medical History: Type 2 Diabetes, Allergic to Penicillin");
         Patient patient2 = new Patient(null, "Sangeeta Sharma", "Medical History: Hypertension");
         patientRepo.save(patient1);
         patientRepo.save(patient2);
 
-        // 3. Create a Prescription for Munna Kumar
+        // 4. Create a Prescription for Munna Kumar
         Prescription p1 = new Prescription();
         p1.setPatient(patient1);
-        p1.setMedicineQuantities(Map.of(aspirin.getId(), 2)); // Needs 2 Aspirin (Stock is 5)
+        p1.setMedicineQuantities(Map.of(aspirin.getId(), 2));
         p1.setStatus("PENDING");
         prescriptionRepo.save(p1);
 
-        // 4. Create a Test Appointment (Module A)
-        // No need to declare 'appointmentRepo = null' here because we injected it above!
-        // 4. Create Doctors and an appointment
+        // 5. Create Doctors
         Doctor doc1 = new Doctor(null, "Dr. Rajesh Verma", "General Physician");
         Doctor doc2 = new Doctor(null, "Dr. Meera Iyer", "Pediatrics");
         doctorRepo.save(doc1);
         doctorRepo.save(doc2);
 
+        // 6. Create an Appointment
         Appointment appt = new Appointment();
         appt.setDoctorId(doc1.getId());
-        appt.setPatient(patient1); // Link to Munna Kumar
-        appt.setAppointmentTime(LocalDateTime.now().plusDays(1)); // Tomorrow
+        appt.setPatient(patient1);
+        appt.setAppointmentTime(LocalDateTime.now().plusDays(1));
         appt.setStatus("BOOKED");
         appointmentRepo.save(appt);
 
         System.out.println("✅ Test Data Loaded Successfully!");
-        System.out.println("   - Patient: " + patient1.getName());
-        System.out.println("   - Medicine: Aspirin (Stock: 5)");
-        System.out.println("   - Prescription: Pending (Needs 2 Aspirin)");
-        System.out.println("   - Appointment: Booked for Doctor: " + doc1.getName());
+        System.out.println("   - Users created: receptionist, doctor, pharmacist, admin");
     }
 }

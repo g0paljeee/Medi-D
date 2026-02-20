@@ -11,14 +11,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/appointments") // <--- CHANGED: Shared Endpoint
+@RequestMapping("/api/appointments") 
 public class AppointmentController {
 
     @Autowired
     private AppointmentRepository appointmentRepo;
 
     @Autowired
-    private PatientRepository patientRepo; // <--- ADDED: To validate patients
+    private PatientRepository patientRepo; //  To validate patients
 
     // 1. View All Appointments (Dashboard for Admin/Receptionist)
     @GetMapping
