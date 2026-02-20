@@ -1,69 +1,151 @@
 package com.example.Medico.controller;
 
-import com.example.Medico.dto.DoctorViewDTO;
-import com.example.Medico.model.Medicine;
-import com.example.Medico.model.Patient;
-import com.example.Medico.model.Prescription;
-import com.example.Medico.repository.MedicineRepository;
-import com.example.Medico.repository.PatientRepository;
-import com.example.Medico.repository.PrescriptionRepository;
+import com.example.Medico.model.Doctor;
+import com.example.Medico.repository.DoctorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/doctor")
+@RequestMapping("/api/doctors")
 public class DoctorController {
 
-    @Autowired private PatientRepository patientRepo;
-    @Autowired private MedicineRepository medicineRepo;
-    @Autowired private PrescriptionRepository prescriptionRepo;
+    @Autowired
+    private DoctorRepository doctorRepository;
 
-    // 1. "Live DB Fetch" - Doctor needs to see what meds are available
-    @GetMapping("/medicines")
-    public List<Medicine> getAvailableMedicines() {
-        return medicineRepo.findAll();
+    // 1. List all doctors (public - for appointment booking)
+    @GetMapping
+    public ResponseEntity<?> getAllDoctors() {
+        try {
+            List<Doctor> doctors = doctorRepository.findAll();
+            return ResponseEntity.ok(Map.of(
+                    "doctors", doctors,
+                    "count", doctors.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch doctors"));
+        }
     }
 
-    // 2. View Patient History (PRIVACY: ALLOWED for Doctor)
-    @GetMapping("/patient/{id}")
-    public ResponseEntity<DoctorViewDTO> getPatientDetails(@PathVariable Long id) {
-        Patient patient = patientRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
-
-        DoctorViewDTO dto = new DoctorViewDTO();
-        dto.setPatientId(patient.getId());
-        dto.setPatientName(patient.getName());
-        dto.setHistoryBlob(patient.getHistoryBlob()); // <--- Doctor sees this!
-
-        return ResponseEntity.ok(dto);
+    // 2. Get doctor by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getDoctorById(@PathVariable Long id) {
+        try {
+            Optional<Doctor> doctor = doctorRepository.findById(id);
+            if (doctor.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Doctor not found"));
+            }
+            return ResponseEntity.ok(doctor.get());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch doctor"));
+        }
     }
 
-    // 3. Create Prescription & Diagnosis
-    @PostMapping("/prescribe")
-    public ResponseEntity<String> createPrescription(@RequestParam Long patientId,
-                                                     @RequestParam String diagnosis,
-                                                     @RequestBody Map<Long, Integer> meds) {
+    // 3. Create new doctor (ADMIN only)
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createDoctor(@RequestBody Map<String, Object> request) {
+        try {
+            // Validate input
+            if (!request.containsKey("name") || !request.containsKey("specialization")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Missing required fields: name, specialization"));
+            }
 
-        // A. Update Patient History with new Diagnosis
-        Patient patient = patientRepo.findById(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+            String name = request.get("name").toString();
+            String specialization = request.get("specialization").toString();
 
-        String newHistory = patient.getHistoryBlob() + " | New Diagnosis: " + diagnosis;
-        patient.setHistoryBlob(newHistory);
-        patientRepo.save(patient);
+            // Validate name is not empty
+            if (name.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Doctor name cannot be empty"));
+            }
 
-        // B. Create Prescription
-        Prescription prescription = new Prescription();
-        prescription.setPatient(patient);
-        prescription.setMedicineQuantities(meds); // The "JSON" list of meds
-        prescription.setStatus("PENDING"); // Ready for Pharmacist
+            // Create doctor
+            Doctor doctor = new Doctor();
+            doctor.setName(name);
+            doctor.setSpecialization(specialization);
 
-        prescriptionRepo.save(prescription);
+            Doctor saved = doctorRepository.save(doctor);
 
-        return ResponseEntity.ok("Prescription Sent to Pharmacy. Diagnosis Saved.");
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                    "message", "Doctor created successfully",
+                    "doctorId", saved.getId(),
+                    "name", saved.getName(),
+                    "specialization", saved.getSpecialization()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create doctor: " + e.getMessage()));
+        }
+    }
+
+    // 4. Update doctor (ADMIN only)
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateDoctor(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        try {
+            Optional<Doctor> doctorOpt = doctorRepository.findById(id);
+            if (doctorOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Doctor not found"));
+            }
+
+            Doctor doctor = doctorOpt.get();
+
+            // Update name if provided
+            if (request.containsKey("name")) {
+                doctor.setName(request.get("name").toString());
+            }
+
+            // Update specialization if provided
+            if (request.containsKey("specialization")) {
+                doctor.setSpecialization(request.get("specialization").toString());
+            }
+
+            Doctor updated = doctorRepository.save(doctor);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Doctor updated successfully",
+                    "doctorId", updated.getId(),
+                    "name", updated.getName(),
+                    "specialization", updated.getSpecialization()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update doctor"));
+        }
+    }
+
+    // 5. Delete doctor (ADMIN only)
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteDoctor(@PathVariable Long id) {
+        try {
+            Optional<Doctor> doctor = doctorRepository.findById(id);
+            if (doctor.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Doctor not found"));
+            }
+
+            doctorRepository.deleteById(id);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Doctor deleted successfully",
+                    "doctorId", id
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete doctor"));
+        }
     }
 }

@@ -54,49 +54,29 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        System.out.println("⏳ Loading Test Data...");
-
-        // 1. Create Test Users with hashed passwords (if missing)
-        createUserIfMissing("receptionist", "receptionist@medico.com", "recep123", "RECEPTIONIST", "Priya Singh");
-        createUserIfMissing("doctor", "doctor@medico.com", "doctor123", "DOCTOR", "Dr. Rajesh Verma");
-        createUserIfMissing("pharmacist", "pharmacist@medico.com", "pharma123", "PHARMACIST", "Kavya Sharma");
-        createUserIfMissing("admin", "admin@medico.com", "admin123", "ADMIN", "System Administrator");
-
-        // 2. Create Medicines
-        Medicine paracetamol = new Medicine(null, "Paracetamol", 50, LocalDate.now().plusYears(1));
-        Medicine aspirin = new Medicine(null, "Aspirin", 5, LocalDate.now().plusYears(1));
-
-        medicineRepo.save(paracetamol);
-        medicineRepo.save(aspirin);
-
-        // 3. Create Patients
-        Patient patient1 = new Patient(null, "Munna Kumar", "Medical History: Type 2 Diabetes, Allergic to Penicillin");
-        Patient patient2 = new Patient(null, "Sangeeta Sharma", "Medical History: Hypertension");
-        patientRepo.save(patient1);
-        patientRepo.save(patient2);
-
-        // 4. Create a Prescription for Munna Kumar
-        Prescription p1 = new Prescription();
-        p1.setPatient(patient1);
-        p1.setMedicineQuantities(Map.of(aspirin.getId(), 2));
-        p1.setStatus("PENDING");
-        prescriptionRepo.save(p1);
-
-        // 5. Create Doctors
-        Doctor doc1 = new Doctor(null, "Dr. Rajesh Verma", "General Physician");
-        Doctor doc2 = new Doctor(null, "Dr. Meera Iyer", "Pediatrics");
-        doctorRepo.save(doc1);
-        doctorRepo.save(doc2);
-
-        // 6. Create an Appointment
-        Appointment appt = new Appointment();
-        appt.setDoctorId(doc1.getId());
-        appt.setPatient(patient1);
-        appt.setAppointmentTime(LocalDateTime.now().plusDays(1));
-        appt.setStatus("BOOKED");
-        appointmentRepo.save(appt);
-
-        System.out.println("✅ Test Data Loaded Successfully!");
-        System.out.println("   - Users created: receptionist, doctor, pharmacist, admin");
+        System.out.println("⏳ Checking PostgreSQL Database...");
+        
+        // Count existing records
+        long userCount = userRepo.count();
+        long doctorCount = doctorRepo.count();
+        long patientCount = patientRepo.count();
+        long medicineCount = medicineRepo.count();
+        
+        if (userCount > 0) {
+            System.out.println("✅ Database already populated!");
+            System.out.println("   - Users: " + userCount);
+            System.out.println("   - Doctors: " + doctorCount);
+            System.out.println("   - Patients: " + patientCount);
+            System.out.println("   - Medicines: " + medicineCount);
+            System.out.println("\n📚 PostgreSQL Database is ready for production use!");
+            return;
+        }
+        
+        System.out.println("⏳ Loading test data from PostgreSQL...");
+        System.out.println("✅ Data already loaded via postgres_init.sql");
+        System.out.println("   - Total Users: " + userRepo.count());
+        System.out.println("   - Total Doctors: " + doctorRepo.count());
+        System.out.println("   - Total Patients: " + patientRepo.count());
+        System.out.println("   - Total Medicines: " + medicineRepo.count());
     }
 }

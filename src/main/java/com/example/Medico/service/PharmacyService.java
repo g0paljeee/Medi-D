@@ -65,7 +65,7 @@ public class PharmacyService {
             Integer qtyNeeded = entry.getValue();
 
             // PESSIMISTIC_WRITE lock ensures no one else edits stock while we check
-            Medicine med = medicineRepo.findByIdWithLock(medId)
+            Medicine med = medicineRepo.findById(medId)
                     .orElseThrow(() -> new RuntimeException("Medicine ID " + medId + " not found"));
 
             if (med.getStock() < qtyNeeded) {

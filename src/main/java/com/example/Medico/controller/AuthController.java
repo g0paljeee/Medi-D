@@ -40,4 +40,15 @@ public class AuthController {
                     .body(new AuthResponse(null, null, null, null, e.getMessage()));
         }
     }
+
+    @PostMapping("/register-temp")
+    public ResponseEntity<AuthResponse> registerTemp(@Valid @RequestBody User user) {
+        try {
+            AuthResponse response = authService.register(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new AuthResponse(null, null, null, null, e.getMessage()));
+        }
+    }
 }
